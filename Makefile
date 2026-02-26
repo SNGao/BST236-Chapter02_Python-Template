@@ -22,6 +22,7 @@ CONDA_ACTIVATE := source $(CONDA_BASE)/etc/profile.d/conda.sh
 
 # Initialize a local Git repository and push to GitHub
 # make init_repo: call the init_repo target to create the GitHub repository and push
+# test some differences
 init: # we call init here as 'target'!
 	git init
 	git add .
