@@ -1,6 +1,6 @@
 # Github variables
-REPO_NAME = Your_Project_Name
-GITHUB_USER = Your_Github_Username
+REPO_NAME = Python_Test
+GITHUB_USER = SNGao
 BRANCH = main
 
 # Specify the desired Python version
@@ -21,11 +21,12 @@ CONDA_ACTIVATE := source $(CONDA_BASE)/etc/profile.d/conda.sh
 
 
 # Initialize a local Git repository and push to GitHub
-init:
+# make init_repo: call the init_repo target to create the GitHub repository and push
+init: # we call init here as 'target'!
 	git init
 	git add .
 	git commit -m "Initial commit"
-	make init_repo
+	make init_repo 
 
 init_repo:
 	gh repo create $(GITHUB_USER)/$(REPO_NAME) --private --source=. --remote=origin

@@ -1,220 +1,149 @@
 ---
-title: "Boston Housing Dataset Analysis Report"
+title: "Boston Housing — Exploratory Data Analysis"
 format:
   html:
-    code-fold: true
     toc: true
-    toc-depth: 3
-    fig-width: 10
-    fig-height: 6
 execute:
   echo: true
   warning: false
+  message: false
 ---
 
-## Setup and Data Loading
+## 1) Set Up Environment (Python + Quarto)
+
+If you haven’t installed packages yet:
+
+```bash
+pip install -U pandas numpy matplotlib seaborn scipy scikit-learn pyyaml
+```
+
+Verify Quarto:
+
+```bash
+quarto --version
+```
+
+## 2) Load + Validate Data
 
 ```{python}
-#| echo: false
-import pandas as pd
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Set style for better visualizations
-plt.style.use('ggplot')
-sns.set_palette('husl')
+np.random.seed(0)
 
-# Load the dataset
-df = pd.read_csv('../data/boston.csv')
+DATA_PATH = Path('data/boston.csv')
+OUTPUT_DIR = Path('outputs/boston_eda_qmd')
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+EXPECTED_COLUMNS = [
+    'CRIM','ZN','INDUS','CHAS','NOX','RM','AGE','DIS','RAD',
+    'TAX','PTRATIO','B','LSTAT','MEDV'
+]
+
+print('cwd:', Path.cwd())
+print('data exists:', DATA_PATH.exists(), DATA_PATH.resolve())
+
+df = pd.read_csv(DATA_PATH)
+print('shape:', df.shape)
+print('missing total:', int(df.isna().sum().sum()))
+print('duplicates:', int(df.duplicated().sum()))
+
+missing_expected = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+extra_cols = [c for c in df.columns if c not in EXPECTED_COLUMNS]
+print('missing expected columns:', missing_expected)
+print('extra columns:', extra_cols)
+
+df.head()
 ```
 
-## Dataset Overview
-
-The Boston Housing dataset contains information about various features of houses in Boston and their median values.
+## 3) Summary Tables
 
 ```{python}
-print(f"Dataset Shape: {df.shape}")
+import numpy as np
+
+numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+desc = df[numeric_cols].describe().T
+
+desc
 ```
 
-### Feature Descriptions
-
-The dataset includes the following features:
-
-- **CRIM**: Per capita crime rate by town
-- **ZN**: Proportion of residential land zoned for lots over 25,000 sq.ft
-- **INDUS**: Proportion of non-retail business acres per town
-- **CHAS**: Charles River dummy variable (1 if tract bounds river; 0 otherwise)
-- **NOX**: Nitric oxides concentration (parts per 10 million)
-- **RM**: Average number of rooms per dwelling
-- **AGE**: Proportion of owner-occupied units built prior to 1940
-- **DIS**: Weighted distances to five Boston employment centers
-- **RAD**: Index of accessibility to radial highways
-- **TAX**: Full-value property-tax rate per $10,000
-- **PTRATIO**: Pupil-teacher ratio by town
-- **B**: 1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town
-- **LSTAT**: % lower status of the population
-- **MEDV**: Median value of owner-occupied homes in $1000's (Target variable)
-
-## Statistical Analysis
-
-### Basic Statistics
-
 ```{python}
-df.describe()
+if 'CHAS' in df.columns:
+    df['CHAS'].value_counts(dropna=False)
 ```
 
-### Missing Values Analysis
-
 ```{python}
-missing_values = df.isnull().sum()
-print("\nMissing Values Count:")
-print(missing_values[missing_values > 0] if missing_values.any() else "No missing values found")
+if 'CHAS' in df.columns and 'MEDV' in df.columns:
+    df.groupby('CHAS', dropna=False)['MEDV'].agg(['count','mean','median','std','min','max'])
 ```
 
-## Price Distribution Analysis
-
-### Distribution of House Prices
+## 4) Correlations
 
 ```{python}
-#| fig-cap: "Distribution of House Prices"
-plt.figure(figsize=(10, 6))
-sns.histplot(data=df, x='MEDV', bins=30)
-plt.title('Distribution of House Prices')
-plt.xlabel('Median Value in $1000s')
-plt.ylabel('Count')
-plt.show()
+pearson = df.corr(numeric_only=True)['MEDV'].sort_values(ascending=False)
+spearman = df.corr(numeric_only=True, method='spearman')['MEDV'].sort_values(ascending=False)
+
+pd.DataFrame({'pearson': pearson, 'spearman': spearman}).round(3)
 ```
 
-### Price Statistics Summary
+## 5) Visualizations (saved to disk too)
 
 ```{python}
-price_stats = {
-    'Mean Price': f"${df['MEDV'].mean():.2f}k",
-    'Median Price': f"${df['MEDV'].median():.2f}k",
-    'Minimum Price': f"${df['MEDV'].min():.2f}k",
-    'Maximum Price': f"${df['MEDV'].max():.2f}k",
-    'Standard Deviation': f"${df['MEDV'].std():.2f}k"
-}
-pd.Series(price_stats)
-```
+sns.set_theme(style='whitegrid')
 
-## Correlation Analysis
+def savefig(name: str) -> Path:
+    path = OUTPUT_DIR / name
+    plt.savefig(path, dpi=200, bbox_inches='tight')
+    print('saved:', path)
+    return path
 
-### Correlation Matrix Heatmap
-
-```{python}
-#| fig-cap: "Correlation Matrix Heatmap"
-plt.figure(figsize=(12, 10))
-correlation_matrix = df.corr()
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
-plt.title('Correlation Matrix')
+plt.figure(figsize=(10, 8))
+sns.heatmap(df.corr(numeric_only=True), cmap='vlag', center=0, square=True)
+plt.title('Correlation heatmap')
 plt.tight_layout()
+savefig('corr_heatmap.png')
 plt.show()
 ```
 
-### Top Correlations with House Prices
-
 ```{python}
-correlations = df.corr()['MEDV'].sort_values(ascending=False)
-print("Correlations with MEDV (House Prices):")
-print(correlations)
-```
-
-## Feature Relationships
-
-### Key Features vs House Prices
-
-```{python}
-#| fig-cap: "Scatter Plots of Key Features vs House Prices"
-fig, axes = plt.subplots(2, 2, figsize=(15, 15))
-axes = axes.ravel()
-
-top_features = ['RM', 'LSTAT', 'PTRATIO', 'NOX']
-for idx, feature in enumerate(top_features):
-    sns.scatterplot(data=df, x=feature, y='MEDV', ax=axes[idx])
-    axes[idx].set_title(f'{feature} vs House Price')
-
+plt.figure(figsize=(8, 5))
+sns.histplot(df['MEDV'], bins=30, kde=True)
+plt.title('MEDV distribution')
 plt.tight_layout()
+savefig('medv_hist.png')
 plt.show()
 ```
-
-### Charles River Location Analysis
 
 ```{python}
-#| fig-cap: "House Prices by Charles River Location"
-plt.figure(figsize=(8, 6))
-sns.boxplot(data=df, x='CHAS', y='MEDV')
-plt.title('House Prices by Charles River Location')
-plt.xlabel('Bounds Charles River (1=Yes, 0=No)')
-plt.ylabel('Median Value in $1000s')
-plt.show()
-
-# Calculate statistics for houses near Charles River
-chas_stats = df.groupby('CHAS')['MEDV'].agg(['mean', 'median', 'count']).round(2)
-chas_stats.index = ['Not on Charles River', 'On Charles River']
-print("\nPrice Statistics by Charles River Location:")
-print(chas_stats)
+for x in ['RM', 'LSTAT', 'PTRATIO', 'NOX']:
+    plt.figure(figsize=(6.5, 5))
+    sns.scatterplot(data=df, x=x, y='MEDV', alpha=0.7, s=18)
+    sns.regplot(data=df, x=x, y='MEDV', scatter=False, color='black', line_kws={'lw': 1})
+    plt.title(f'MEDV vs {x}')
+    plt.tight_layout()
+    savefig(f'scatter_{x.lower()}_medv.png')
+    plt.show()
 ```
 
-## Feature Distributions
+## 6) Render
 
-```{python}
-#| fig-cap: "Distribution of All Features"
-fig, axes = plt.subplots(4, 4, figsize=(20, 20))
-axes = axes.ravel()
+Convert from notebook (optional):
 
-for idx, col in enumerate(df.columns):
-    sns.histplot(data=df, x=col, ax=axes[idx], bins=30)
-    axes[idx].set_title(f'Distribution of {col}')
-
-plt.tight_layout()
-plt.show()
+```bash
+quarto convert sandbox/boston_eda.ipynb --output sandbox/boston_eda_from_ipynb.qmd
 ```
 
-## Key Findings
+Render this `.qmd`:
 
-1. **Dataset Information**:
-   - Number of samples: {df.shape[0]}
-   - Number of features: {df.shape[1]-1} (excluding target variable)
-   - Complete dataset with no missing values
-
-2. **Price Distribution**:
-   - Mean house price: ${df['MEDV'].mean():.2f}k
-   - Median house price: ${df['MEDV'].median():.2f}k
-   - Shows right-skewed distribution
-   - Price range: ${df['MEDV'].min():.2f}k - ${df['MEDV'].max():.2f}k
-
-3. **Key Correlations with House Prices**:
-   - Strong positive correlation with average number of rooms (RM)
-   - Strong negative correlation with lower status population percentage (LSTAT)
-   - Moderate negative correlation with pupil-teacher ratio (PTRATIO)
-   - Moderate negative correlation with nitric oxide concentration (NOX)
-
-4. **Charles River Effect**:
-   - Houses near Charles River tend to have higher median values
-   - {len(df[df['CHAS'] == 1])} houses are located near the Charles River
-   - Average price difference: ${df[df['CHAS'] == 1]['MEDV'].mean() - df[df['CHAS'] == 0]['MEDV'].mean():.2f}k
-
-5. **Notable Patterns**:
-   - Higher room count generally indicates higher house prices
-   - Areas with lower status population percentage tend to have lower house prices
-   - Environmental factors (NOX) show negative correlation with prices
-   - Education quality (PTRATIO) impacts house prices
-
-## Recommendations for Further Analysis
-
-1. **Feature Engineering**:
-   - Create interaction features between highly correlated variables
-   - Consider polynomial features for non-linear relationships
-   - Develop neighborhood clustering based on multiple features
-
-2. **Model Development**:
-   - Test different regression algorithms
-   - Consider separate models for different price segments
-   - Implement feature selection based on correlation analysis
-
-3. **Additional Investigations**:
-   - Analyze spatial patterns if location data becomes available
-   - Study the impact of environmental factors on price
-   - Investigate potential market segments
+```bash
+quarto render sandbox/boston_eda.qmd
+```

@@ -6,8 +6,11 @@
 *.Rproj
 renv/
 
-
-
+# Python venv/
+.venv/
+.pdf
+.docx
+.xlsx
 
 
 # data

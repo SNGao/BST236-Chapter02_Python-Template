@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 import json
+import config.config as config
 
 class DataLoader:
     def __init__(self, config_path='src/config/config.yaml'):
