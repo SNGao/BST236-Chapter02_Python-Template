@@ -2,11 +2,6 @@
 
 ## Workflow Guide
 
-just test, and add something new.
-add something new in the websit
-
-
-have something added in the laptop.
 
 ### 1. Initial Setup
 
